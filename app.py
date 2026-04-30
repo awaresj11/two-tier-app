@@ -1,38 +1,47 @@
-from flask import Flask, render_template, request
-import mysql.connector
 import os
+from flask import Flask, render_template, request, redirect, url_for, jsonify
+from flask_mysqldb import MySQL
 
 app = Flask(__name__)
 
-db = mysql.connector.connect(
-    host="mysql",
-    user="root",
-    password="root",
-    database="devops"
-)
+# Configure MySQL from environment variables
+app.config['MYSQL_HOST'] = os.environ.get('MYSQL_HOST', 'localhost')
+app.config['MYSQL_USER'] = os.environ.get('MYSQL_USER', 'default_user')
+app.config['MYSQL_PASSWORD'] = os.environ.get('MYSQL_PASSWORD', 'default_password')
+app.config['MYSQL_DB'] = os.environ.get('MYSQL_DB', 'default_db')
 
-cursor = db.cursor()
+# Initialize MySQL
+mysql = MySQL(app)
 
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS users (
-id INT AUTO_INCREMENT PRIMARY KEY,
-name VARCHAR(100)
-)
-""")
+def init_db():
+    with app.app_context():
+        cur = mysql.connection.cursor()
+        cur.execute('''
+        CREATE TABLE IF NOT EXISTS messages (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            message TEXT
+        );
+        ''')
+        mysql.connection.commit()  
+        cur.close()
 
-@app.route("/", methods=["GET", "POST"])
-def home():
-    if request.method == "POST":
-        name = request.form["name"]
-        cursor.execute("INSERT INTO users(name) VALUES(%s)", (name,))
-        db.commit()
+@app.route('/')
+def hello():
+    cur = mysql.connection.cursor()
+    cur.execute('SELECT message FROM messages')
+    messages = cur.fetchall()
+    cur.close()
+    return render_template('index.html', messages=messages)
 
-    cursor.execute("SELECT * FROM users")
-    data = cursor.fetchall()
-    return render_template("index.html", users=data)
+@app.route('/submit', methods=['POST'])
+def submit():
+    new_message = request.form.get('new_message')
+    cur = mysql.connection.cursor()
+    cur.execute('INSERT INTO messages (message) VALUES (%s)', [new_message])
+    mysql.connection.commit()
+    cur.close()
+    return jsonify({'message': new_message})
 
-@app.route("/health")
-def health():
-    return "OK", 200
-
-app.run(host="0.0.0.0", port=5000)
+if __name__ == '__main__':
+    init_db()
+    app.run(host='0.0.0.0', port=5000, debug=True)
