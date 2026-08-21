@@ -3,7 +3,8 @@ version: '3.8'
 services:
 
   flaskapp:
-    build: .
+    build: 
+      context: .
     container_name: flaskapp
     ports:
       - "5000:5000"
@@ -21,14 +22,13 @@ services:
       - two-tier
 
   mysql:
-    image: mysql:8
+    image: mysql:5.7
     container_name: mysql
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: devops
     ports:
       - "3306:3306"
-    restart: always
     volumes:
       - mysql-data:/var/lib/mysql
 
